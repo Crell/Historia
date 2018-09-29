@@ -14,7 +14,7 @@ class CollectionTest extends TestCase
 
     public function test_can_assign_shelf() : void
     {
-        $c = new Collection();
+        $c = new Collection('col');
 
         $c->addShelf('documents', new TestShelf());
 

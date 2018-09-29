@@ -13,8 +13,16 @@ class Collection
     /** @var string */
     protected $defaultShelf;
 
-    public function __construct()
+    /**
+     * @var string
+     */
+    protected $language;
+
+
+    public function __construct(string $name, $language = 'en')
     {
+        $this->name = $name;
+        $this->language = $language;
     }
 
     public function addShelf(string $name, ShelfInterface $shelf) : self
@@ -38,4 +46,7 @@ class Collection
     {
         return $this->defaultShelf;
     }
+
+
+
 }
