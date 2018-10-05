@@ -21,26 +21,56 @@ class TestShelf implements ShelfInterface
 class CollectionTest extends TestCase
 {
 
-    public function test_can_assign_shelf() : void
+    public function setUp()
     {
-        $c = new Collection('col');
+        parent::setUp();
 
-        $c->addShelf('documents', new TestShelf());
+        $conn = $this->getConnection();
+        $conn->query(sprintf('DROP DATABASE IF EXISTS %s', $this->dbName()));
+        $conn->query(sprintf('CREATE DATABASE %s', $this->dbName()));
 
-        $this->assertEquals('documents', $c->getDefaultShelf());
     }
 
-    public function _test_can_initialize() : void
+    protected function dbName() : string
     {
+        return getenv('HISTORIA_DB_NAME') ?: 'historia';
+    }
 
-        #$dsn =
-        new \PDO($dsn, 'root', 'test');
+    protected function getConnection() : \PDO
+    {
+        $host = getenv('HISTORIA_DB_HOST') ?: '127.0.0.1';
+        $port = getenv('HISTORIA_DB_HOST') ?: '3306';
 
-        $c = new Collection('col');
+        $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s', $host, $port, $this->dbName());
+        $conn = new \PDO($dsn, 'root', 'test', [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            // So we don't have to mess around with cursors and unbuffered queries by default.
+            \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => TRUE,
+            // Make sure MySQL returns all matched rows on update queries including
+            // rows that actually didn't have to be updated because the values didn't
+            // change. This matches common behavior among other database systems.
+            \PDO::MYSQL_ATTR_FOUND_ROWS => TRUE,
+            // Because MySQL's prepared statements skip the query cache, because it's dumb.
+            \PDO::ATTR_EMULATE_PREPARES => TRUE,
+            // Make it harder to hack a second query into the query string.
+            \PDO::MYSQL_ATTR_MULTI_STATEMENTS => FALSE,
+        ]);
 
-        $c->addShelf('documents', new TextShelf());
+        return $conn;
+    }
 
-        /** @var TextRecord $a */
+    public function test_can_initialize() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $stmt = $this->getConnection()->query('SELECT 1 FROM historia_col_documents');
+
+        // PDO error handling sucks. query() returns false if the table doesn't exist, or a real statement if it does.
+        $this->assertInstanceOf(\PDOStatement::class, $stmt);
+
+
+        /*
         $a = $c->create('documents');
 
         $a->setValue('Hello World');
@@ -50,5 +80,20 @@ class CollectionTest extends TestCase
         $commit->add('documents', $a);
 
         $c->commit($commit);
+        */
+    }
+
+    public function test_save_document() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $uuid = '12345';
+        $value = 'this is a test';
+
+        $c->save($uuid, $value);
+
+        $saved = $c->load($uuid);
+        $this->assertEquals($value, $saved);
     }
 }

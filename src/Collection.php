@@ -25,20 +25,57 @@ class Collection
      */
     protected $workspace = 'default';
 
-    public function __construct(string $name, $language = 'en')
+    /**
+     * @var \PDO
+     */
+    protected $conn;
+
+    public function __construct(\PDO $conn, string $name, $language = 'en')
     {
+        $this->conn = $conn;
         $this->name = $name;
         $this->language = $language;
+    }
+
+    protected function tableName(string $table) : string
+    {
+        return sprintf('historia_%s_%s', $this->name, $table);
     }
 
     public function initializeSchema() : self
     {
 
-        foreach ($this->shelves as $name => $shelf) {
-            
-        }
+        $res = $this->conn->query("CREATE TABLE IF NOT EXISTS " . $this->tableName('documents') . "(
+            uuid VARCHAR(36),
+            updated TIMESTAMP DEFAULT NOW(),
+            document TEXT,
+            PRIMARY KEY (uuid)
+        )");
 
         return $this;
+    }
+
+    public function save(string $uuid, string $value)
+    {
+        try {
+            $this->conn->beginTransaction();
+            $stmt = $this->conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
+            $stmt->execute([
+                ':uuid' => $uuid,
+                ':value' => $value,
+            ]);
+        }
+        finally {
+            $this->conn->commit();
+        }
+    }
+
+    public function load(string $uuid) : string
+    {
+        $stmt = $this->conn->prepare(sprintf("SELECT document FROM %s WHERE uuid=:uuid", $this->tableName('documents')));
+        $stmt->execute([':uuid' => $uuid]);
+        $value = $stmt->fetchColumn();
+        return $value;
     }
 
     public function addShelf(string $name, ShelfInterface $shelf) : self
