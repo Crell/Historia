@@ -64,9 +64,10 @@ class CollectionTest extends TestCase
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
 
+        // This wil throw an exception if the table doesn't exist, as long as PDO is in exception mode.
         $stmt = $this->getConnection()->query('SELECT 1 FROM historia_col_documents');
 
-        // PDO error handling sucks. query() returns false if the table doesn't exist, or a real statement if it does.
+        // Give us an assertion to keep PHPUnit happy.
         $this->assertInstanceOf(\PDOStatement::class, $stmt);
 
 
