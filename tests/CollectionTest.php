@@ -3,19 +3,7 @@ declare(strict_types=1);
 
 namespace Crell\Historia;
 
-use Crell\Historia\Shelf\ShelfInterface;
-use Crell\Historia\Shelf\TextRecord;
-use Crell\Historia\Shelf\TextShelf;
 use PHPUnit\Framework\TestCase;
-
-
-class TestShelf implements ShelfInterface
-{
-    public function create()
-    {
-
-    }
-}
 
 
 class CollectionTest extends TestCase
