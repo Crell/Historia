@@ -66,13 +66,9 @@ class Collection
 
     public function save(string $uuid, string $value)
     {
-        $this->withTransaction(function(\PDO $conn) use ($uuid, $value) {
-            $stmt = $conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
-            $stmt->execute([
-                ':uuid' => $uuid,
-                ':value' => $value,
-            ]);
-        });
+        $commit = $this->newCommit();
+        $commit->add($uuid, $value);
+        $this->commit($commit);
     }
 
     public function load(string $uuid) : string
