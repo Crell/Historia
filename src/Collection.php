@@ -154,7 +154,6 @@ class Collection
             if (count($deleteIds)) {
                 $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
                 $query = sprintf('DELETE FROM %s WHERE uuid IN (%s)', $this->tableName('documents'), $placeholders);
-                print_r($query);
                 $stmt = $conn->prepare($query);
                 $stmt->execute($deleteIds);
             }
