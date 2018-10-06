@@ -139,16 +139,16 @@ class Collection
 
     public function commit(Commit $commit)
     {
-        $records = $commit->getRecords();
-        // @todo Hard code text for now. We'll sort this out later.
-
-        $records = $records[$this->defaultShelf];
-
-        // Start DB transaction
-
-
-
-        // Close DB transaction
+        $this->withTransaction(function (\PDO $conn) use ($commit) {
+            $records = $commit->getRecords();
+            foreach ($records as $uuid => $value) {
+                $stmt = $conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
+                $stmt->execute([
+                    ':uuid' => $uuid,
+                    ':value' => $value,
+                ]);
+            }
+        });
     }
 
     /**

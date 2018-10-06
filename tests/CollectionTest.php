@@ -97,4 +97,22 @@ class CollectionTest extends TestCase
         $saved = $c->load($uuid);
         $this->assertEquals($value, $saved);
     }
+
+    public function test_save_multiple_documents() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+
+        $commit->add('12345', 'hello world');
+        $commit->add('4567', 'goodbye world');
+
+        $c->commit($commit);
+
+        $r1 = $c->load('12345');
+        $r2 = $c->load('4567');
+        $this->assertEquals('hello world', $r1);
+        $this->assertEquals('goodbye world', $r2);
+    }
 }
