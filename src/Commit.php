@@ -28,7 +28,12 @@ class Commit implements \Countable
     /**
      * @var array
      */
-    protected $records = [];
+    protected $addRecords = [];
+
+    /**
+     * @var array
+     */
+    protected $deleteRecords = [];
 
     /**
      * Constructs a new Commit object.
@@ -51,12 +56,17 @@ class Commit implements \Countable
      */
     public function getIterator()
     {
-        return new \ArrayIterator($this->records);
+        return new \ArrayIterator($this->addRecords);
     }
 
-    public function getRecords()
+    public function getAddRecords()
     {
-        return $this->records;
+        return $this->addRecords;
+    }
+
+    public function getDeleteRecords() : array
+    {
+        return array_unique($this->deleteRecords);
     }
 
     /**
@@ -67,12 +77,18 @@ class Commit implements \Countable
      */
     public function count()
     {
-        return count($this->records);
+        return count($this->addRecords);
     }
 
     public function add(string $uuid, string $value) : self
     {
-        $this->records[$uuid] = $value;
+        $this->addRecords[$uuid] = $value;
+        return $this;
+    }
+
+    public function delete(string $uuid) : self
+    {
+        $this->deleteRecords[] = $uuid;
         return $this;
     }
 }

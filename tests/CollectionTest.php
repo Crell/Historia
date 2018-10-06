@@ -132,4 +132,23 @@ class CollectionTest extends TestCase
         $r1 = $c->load('12345');
         $this->assertEquals('goodbye world', $r1);
     }
+
+    public function test_deleting_record() : void
+    {
+        $this->expectException(RecordNotFound::class);
+
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add('12345', 'hello world');
+        $c->commit($commit);
+
+        $commit = $c->newCommit();
+        $commit->delete('12345');
+        $c->commit($commit);
+
+        // Loading a UUID that doesn't exist should trigger an exception.
+        $r1 = $c->load('12345');
+    }
 }

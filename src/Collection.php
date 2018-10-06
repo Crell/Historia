@@ -76,6 +76,9 @@ class Collection
         $stmt = $this->conn->prepare(sprintf("SELECT document FROM %s WHERE uuid=:uuid", $this->tableName('documents')));
         $stmt->execute([':uuid' => $uuid]);
         $value = $stmt->fetchColumn();
+        if (!$value) {
+            throw RecordNotFound::forUuid($uuid);
+        }
         return $value;
     }
 
@@ -136,14 +139,27 @@ class Collection
     public function commit(Commit $commit)
     {
         $this->withTransaction(function (\PDO $conn) use ($commit) {
-            $records = $commit->getRecords();
-            foreach ($records as $uuid => $value) {
-                $stmt = $conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
-                $stmt->execute([
-                    ':uuid' => $uuid,
-                    ':value' => $value,
-                ]);
+            $addRecords = $commit->getAddRecords();
+            if (count($addRecords)) {
+                foreach ($addRecords as $uuid => $value) {
+                    $stmt = $conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
+                    $stmt->execute([
+                        ':uuid' => $uuid,
+                        ':value' => $value,
+                    ]);
+                }
             }
+
+            $deleteIds = array_values($commit->getDeleteRecords());
+            if (count($deleteIds)) {
+                $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
+                $query = sprintf('DELETE FROM %s WHERE uuid IN (%s)', $this->tableName('documents'), $placeholders);
+                print_r($query);
+                $stmt = $conn->prepare($query);
+                $stmt->execute($deleteIds);
+            }
+
+
         });
     }
 
