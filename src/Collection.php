@@ -66,17 +66,13 @@ class Collection
 
     public function save(string $uuid, string $value)
     {
-        try {
-            $this->conn->beginTransaction();
-            $stmt = $this->conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
+        $this->withTransaction(function(\PDO $conn) use ($uuid, $value) {
+            $stmt = $conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
             $stmt->execute([
                 ':uuid' => $uuid,
                 ':value' => $value,
             ]);
-        }
-        finally {
-            $this->conn->commit();
-        }
+        });
     }
 
     public function load(string $uuid) : string
@@ -153,5 +149,27 @@ class Collection
 
 
         // Close DB transaction
+    }
+
+    /**
+     * Wraps a callable into a transaction.
+     *
+     * @param callable $func
+     *   The callable that makes up the transaction.
+     * @return \PDOStatement|null, depending on the query type.
+     *
+     * @throws \Throwable
+     */
+    public function withTransaction(callable $func) : ?\PDOStatement
+    {
+        try {
+            $this->conn->beginTransaction();
+            $res = $func($this->conn);
+            $this->conn->commit();
+            return $res;
+        } catch (\Throwable $e) {
+            $this->conn->rollBack();
+            throw $e;
+        }
     }
 }
