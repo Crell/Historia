@@ -53,7 +53,13 @@ class Collection
             end_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW END,
             PERIOD FOR SYSTEM_TIME(start_timestamp, end_timestamp),
             PRIMARY KEY (uuid)
-        )");
+        ) WITH SYSTEM VERSIONING");
+
+        $res = $this->conn->query('CREATE FUNCTION CURRENT_XID() RETURNS VARCHAR(18)
+            BEGIN
+                RETURN (SELECT TRX_ID FROM INFORMATION_SCHEMA.INNODB_TRX
+                        WHERE TRX_MYSQL_THREAD_ID = CONNECTION_ID());
+            END');
 
         return $this;
     }
