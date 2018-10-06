@@ -71,21 +71,22 @@ class Collection
         $this->commit($commit);
     }
 
-    public function load(string $uuid) : string
+    public function load(string $uuid) : Record
     {
-        $stmt = $this->conn->prepare(sprintf("SELECT document FROM %s WHERE uuid=:uuid", $this->tableName('documents')));
-        $stmt->execute([':uuid' => $uuid]);
-        $value = $stmt->fetchColumn();
-        if (!$value) {
+        $records = $this->loadMultiple([$uuid]);
+
+        if (!count($records)) {
             throw RecordNotFound::forUuid($uuid);
         }
-        return $value;
+
+        return current(iterator_to_array($records));
+
     }
 
     public function loadMultiple(iterable $uuids) : iterable
     {
         // Let people pass in any iterable, but we really do need an array internally.
-        if (!is_array($uuids)) {
+        if ($uuids instanceof \Traversable) {
             $uuids = iterator_to_array($uuids);
         }
 
@@ -93,23 +94,21 @@ class Collection
             return [];
         }
 
-        if (count($uuids)) {
-            $placeholders = implode(',', array_fill(0, count($uuids), '?'));
-            $query = sprintf('SELECT uuid, document, updated FROM %s WHERE uuid IN (%s)', $this->tableName('documents'), $placeholders);
-            $stmt = $this->conn->prepare($query);
-            $stmt->execute($uuids);
+        $placeholders = implode(',', array_fill(0, count($uuids), '?'));
+        $query = sprintf('SELECT uuid, document, updated FROM %s WHERE uuid IN (%s)', $this->tableName('documents'), $placeholders);
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($uuids);
 
-            $stmt->setFetchMode(\PDO::FETCH_CLASS, Record::class);
+        $stmt->setFetchMode(\PDO::FETCH_CLASS, Record::class);
 
-            $returns = function () use ($stmt) {
-                foreach ($stmt as $record) {
-                    yield $record->uuid => $record;
-                }
-            };
+        $returns = function () use ($stmt) {
+            foreach ($stmt as $record) {
+                yield $record->uuid => $record;
+            }
+        };
 
-            // Force the records into the order provided.
-            return new OrderedSet($returns(), $uuids);
-        }
+        // Force the records into the order provided.
+        return new OrderedSet($returns(), $uuids);
     }
 
     public function addShelf(string $name, ShelfInterface $shelf) : self

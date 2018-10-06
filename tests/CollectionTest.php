@@ -83,7 +83,7 @@ class CollectionTest extends TestCase
         $c->save($uuid, $value);
 
         $saved = $c->load($uuid);
-        $this->assertEquals($value, $saved);
+        $this->assertEquals($value, $saved->document);
     }
 
     public function test_save_multiple_documents() : void
@@ -100,8 +100,8 @@ class CollectionTest extends TestCase
 
         $r1 = $c->load('12345');
         $r2 = $c->load('4567');
-        $this->assertEquals('hello world', $r1);
-        $this->assertEquals('goodbye world', $r2);
+        $this->assertEquals('hello world', $r1->document);
+        $this->assertEquals('goodbye world', $r2->document);
     }
 
     public function test_updating_record_works() : void
@@ -118,7 +118,7 @@ class CollectionTest extends TestCase
         $c->commit($commit);
 
         $r1 = $c->load('12345');
-        $this->assertEquals('goodbye world', $r1);
+        $this->assertEquals('goodbye world', $r1->document);
     }
 
     public function test_deleting_record() : void
