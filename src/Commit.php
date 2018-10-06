@@ -80,9 +80,9 @@ class Commit implements \Countable
         return count($this->addRecords);
     }
 
-    public function add(string $uuid, string $value) : self
+    public function add(Record $record) : self
     {
-        $this->addRecords[$uuid] = $value;
+        $this->addRecords[] = $record;
         return $this;
     }
 

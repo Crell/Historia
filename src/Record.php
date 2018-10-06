@@ -20,8 +20,25 @@ class Record
      */
     public $updated;
 
-    public function __construct()
+    /**
+     * @var string
+     */
+    public $language = '';
+
+    public function __construct(string $uuid = '', string $language = 'en', string $document = '')
     {
-        $this->updated = new \DateTimeImmutable();
+        // The empty checks here are because this class is instantiated from the database via PDO, which populates
+        // the properties before the constructor is called. So the constructor gets called second, then overwrites
+        // the values with the defaults above. Because PDO is stupid.
+        $this->uuid = $this->uuid ?: $uuid;
+        $this->language = $this->language ?: $language;
+        $this->document = $this->document ?: $document;
+
+        // The date time value in the database is a string, but we want it upcast to an object. Do that here.
+        if (is_string($this->updated)) {
+            $this->updated = new \DateTimeImmutable($this->updated);
+        } else {
+            $this->updated = $this->updated ?: new \DateTimeImmutable();
+        }
     }
 }

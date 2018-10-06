@@ -57,19 +57,6 @@ class CollectionTest extends TestCase
 
         // Give us an assertion to keep PHPUnit happy.
         $this->assertInstanceOf(\PDOStatement::class, $stmt);
-
-
-        /*
-        $a = $c->create('documents');
-
-        $a->setValue('Hello World');
-
-        $commit = $c->newCommit();
-
-        $commit->add('documents', $a);
-
-        $c->commit($commit);
-        */
     }
 
     public function test_save_document() : void
@@ -80,7 +67,7 @@ class CollectionTest extends TestCase
         $uuid = '12345';
         $value = 'this is a test';
 
-        $c->save($uuid, $value);
+        $c->save(new Record($uuid, 'en', $value));
 
         $saved = $c->load($uuid);
         $this->assertEquals($value, $saved->document);
@@ -93,8 +80,8 @@ class CollectionTest extends TestCase
 
         $commit = $c->newCommit();
 
-        $commit->add('12345', 'hello world');
-        $commit->add('4567', 'goodbye world');
+        $commit->add(new Record('12345', 'en', 'hello world'))
+            ->add(new Record('4567', 'en', 'goodbye world'));
 
         $c->commit($commit);
 
@@ -110,11 +97,11 @@ class CollectionTest extends TestCase
         $c->initializeSchema();
 
         $commit = $c->newCommit();
-        $commit->add('12345', 'hello world');
+        $commit->add(new Record('12345', 'en', 'hello world'));
         $c->commit($commit);
 
         $commit = $c->newCommit();
-        $commit->add('12345', 'goodbye world');
+        $commit->add(new Record('12345', 'en', 'goodbye world'));
         $c->commit($commit);
 
         $r1 = $c->load('12345');
@@ -129,11 +116,11 @@ class CollectionTest extends TestCase
         $c->initializeSchema();
 
         $commit = $c->newCommit();
-        $commit->add('12345', 'hello world');
+        $commit->add(new Record('12345', 'en', 'hello world'));
         $c->commit($commit);
 
         $commit = $c->newCommit();
-        $commit->delete('12345');
+        $commit->delete('12345', 'en');
         $c->commit($commit);
 
         // Loading a UUID that doesn't exist should trigger an exception.
@@ -147,8 +134,8 @@ class CollectionTest extends TestCase
 
         $commit = $c->newCommit();
 
-        $commit->add('12345', 'hello world');
-        $commit->add('4567', 'goodbye world');
+        $commit->add(new Record('12345', 'en', 'hello world'))
+            ->add(new Record('4567', 'en', 'goodbye world'));
 
         $c->commit($commit);
 
@@ -166,7 +153,7 @@ class CollectionTest extends TestCase
 
         $commit = $c->newCommit();
 
-        $commit->add('12345', 'hello world');
+        $commit->add(new Record('12345', 'en', 'hello world'));
 
         $c->commit($commit);
 
@@ -186,5 +173,49 @@ class CollectionTest extends TestCase
         $records = $c->loadMultiple(['12345', '4567']);
 
         $this->assertCount(0, $records);
+    }
+
+    public function test_saving_in_different_languages() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'));
+        $c->commit($commit);
+
+        $cFr = $c->forLanguage('fr');
+
+        $commit = $cFr->newCommit();
+        $commit->add(new Record('12345', 'fr', 'bonjour monde'));
+        $cFr->commit($commit);
+
+        $english = $c->load('12345');
+        $french = $c->forLanguage('fr')->load('12345');
+
+        $this->assertEquals('hello world', $english->document);
+        $this->assertEquals('bonjour monde', $french->document);
+    }
+
+    public function test_deleting_selected_languages() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'))
+            ->add(new Record('12345', 'fr', 'bonjour monde'));
+        $c->commit($commit);
+
+        $commit = $c->newCommit();
+        $commit->delete('12345', 'en');
+        $c->commit($commit);
+
+        // French should still be there, so this should not error.
+        $c->forLanguage('fr')->load('12345');
+
+        $this->expectException(RecordNotFound::class);
+        // This tries to load in English, which we just deleted.
+        $c->load('12345');
     }
 }

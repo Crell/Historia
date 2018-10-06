@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Crell\Historia;
 
-
 use Crell\Historia\Shelf\ShelfInterface;
 
 class Collection
@@ -47,12 +46,13 @@ class Collection
 
         $res = $this->conn->query("CREATE TABLE IF NOT EXISTS " . $this->tableName('documents') . "(
             uuid VARCHAR(36),
+            language VARCHAR(5),
             updated TIMESTAMP DEFAULT NOW(),
             document TEXT,
             start_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW START,
             end_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW END,
             PERIOD FOR SYSTEM_TIME(start_timestamp, end_timestamp),
-            PRIMARY KEY (uuid)
+            PRIMARY KEY (uuid, language)
         ) WITH SYSTEM VERSIONING");
 
         $res = $this->conn->query('CREATE FUNCTION CURRENT_XID() RETURNS VARCHAR(18)
@@ -64,10 +64,10 @@ class Collection
         return $this;
     }
 
-    public function save(string $uuid, string $value)
+    public function save(Record $record)
     {
         $commit = $this->newCommit();
-        $commit->add($uuid, $value);
+        $commit->add($record);
         $this->commit($commit);
     }
 
@@ -76,7 +76,7 @@ class Collection
         $records = $this->loadMultiple([$uuid]);
 
         if (!count($records)) {
-            throw RecordNotFound::forUuid($uuid);
+            throw RecordNotFound::forUuid($uuid, $this->language);
         }
 
         return current(iterator_to_array($records));
@@ -95,9 +95,10 @@ class Collection
         }
 
         $placeholders = implode(',', array_fill(0, count($uuids), '?'));
-        $query = sprintf('SELECT uuid, document, updated FROM %s WHERE uuid IN (%s)', $this->tableName('documents'), $placeholders);
+        $values = array_merge([$this->language], $uuids);
+        $query = sprintf('SELECT uuid, document, language, updated FROM %s WHERE language=? AND uuid IN (%s)', $this->tableName('documents'), $placeholders);
         $stmt = $this->conn->prepare($query);
-        $stmt->execute($uuids);
+        $stmt->execute($values);
 
         $stmt->setFetchMode(\PDO::FETCH_CLASS, Record::class);
 
@@ -170,24 +171,27 @@ class Collection
         $this->withTransaction(function (\PDO $conn) use ($commit) {
             $addRecords = $commit->getAddRecords();
             if (count($addRecords)) {
-                foreach ($addRecords as $uuid => $value) {
-                    $stmt = $conn->prepare(sprintf("INSERT INTO %s SET document=:value, uuid=:uuid ON DUPLICATE KEY UPDATE document=:value, updated=NOW()", $this->tableName('documents')));
-                    $stmt->execute([
-                        ':uuid' => $uuid,
-                        ':value' => $value,
-                    ]);
+                foreach ($addRecords as $record) {
+                    $query = sprintf("INSERT INTO %s SET document=:document, language=:language, uuid=:uuid ON DUPLICATE KEY 
+                        UPDATE document=:document, language=:language, updated=NOW()", $this->tableName('documents'));
+                    $values = [
+                        ':uuid' => $record->uuid,
+                        ':document' => $record->document,
+                        ':language' => $record->language,
+                    ];
+                    $stmt = $conn->prepare($query);
+                    $stmt->execute($values);
                 }
             }
 
             $deleteIds = array_values($commit->getDeleteRecords());
             if (count($deleteIds)) {
                 $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
-                $query = sprintf('DELETE FROM %s WHERE uuid IN (%s)', $this->tableName('documents'), $placeholders);
+                $values = array_merge([$this->language], $deleteIds);
+                $query = sprintf('DELETE FROM %s WHERE language=? AND uuid IN (%s)', $this->tableName('documents'), $placeholders);
                 $stmt = $conn->prepare($query);
-                $stmt->execute($deleteIds);
+                $stmt->execute($values);
             }
-
-
         });
     }
 
