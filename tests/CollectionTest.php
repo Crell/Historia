@@ -139,4 +139,52 @@ class CollectionTest extends TestCase
         // Loading a UUID that doesn't exist should trigger an exception.
         $r1 = $c->load('12345');
     }
+
+    public function test_load_multiple_existing_records() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+
+        $commit->add('12345', 'hello world');
+        $commit->add('4567', 'goodbye world');
+
+        $c->commit($commit);
+
+        $records = $c->loadMultiple(['12345', '4567']);
+
+        $this->assertCount(2, $records);
+        $this->assertEquals('hello world', $records['12345']->document);
+        $this->assertEquals('goodbye world', $records['4567']->document);
+    }
+
+    public function test_load_multiple_partially_existing_records() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+
+        $commit->add('12345', 'hello world');
+
+        $c->commit($commit);
+
+        $records = $c->loadMultiple(['12345', '4567']);
+
+        $this->assertCount(1, $records);
+        $this->assertEquals('hello world', $records['12345']->document);
+        $this->assertEquals('12345', $records['12345']->uuid);
+        $this->assertInstanceOf(\DateTimeImmutable::class, $records['12345']->updated);
+    }
+
+    public function test_load_multiple_on_no_records_is_empty_return() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $records = $c->loadMultiple(['12345', '4567']);
+
+        $this->assertCount(0, $records);
+    }
 }
