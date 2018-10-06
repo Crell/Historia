@@ -8,12 +8,6 @@ use Crell\Historia\Shelf\ShelfInterface;
 class Collection
 {
 
-    /** @var ShelfInterface[] */
-    protected $shelves;
-
-    /** @var string */
-    protected $defaultShelf;
-
     /**
      * @var string
      */
@@ -110,28 +104,6 @@ class Collection
 
         // Force the records into the order provided.
         return new OrderedSet($returns(), $uuids);
-    }
-
-    public function addShelf(string $name, ShelfInterface $shelf) : self
-    {
-        $this->shelves[$name] = $shelf;
-
-        if (empty($this->defaultShelf)) {
-            $this->setDefaultShelf($name);
-        }
-
-        return $this;
-    }
-
-    public function setDefaultShelf(string $name) : self
-    {
-        $this->defaultShelf = $name;
-        return $this;
-    }
-
-    public function getDefaultShelf() : string
-    {
-        return $this->defaultShelf;
     }
 
     public function name() : string
