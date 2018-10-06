@@ -115,4 +115,21 @@ class CollectionTest extends TestCase
         $this->assertEquals('hello world', $r1);
         $this->assertEquals('goodbye world', $r2);
     }
+
+    public function test_updating_record_works() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add('12345', 'hello world');
+        $c->commit($commit);
+
+        $commit = $c->newCommit();
+        $commit->add('12345', 'goodbye world');
+        $c->commit($commit);
+
+        $r1 = $c->load('12345');
+        $this->assertEquals('goodbye world', $r1);
+    }
 }
