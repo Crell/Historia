@@ -156,16 +156,11 @@ class Collection
                 }
             }
 
-            $deleteIds = array_values($commit->getDeleteRecords());
-            if (count($deleteIds)) {
-                $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
-                $values = array_merge([$this->language], $deleteIds);
-                $query = sprintf('DELETE FROM %s WHERE language=? AND uuid IN (%s)', $this->tableName('documents'), $placeholders);
-                $stmt = $conn->prepare($query);
-                $stmt->execute($values);
-                // @todo This is the wrong language, but we'll fix it for this whole block later.
-                foreach ($deleteIds as $uuid) {
-                    $affected['deleted'][] = ['uuid' => $uuid, 'language' => $this->language];
+            $deleteRecords = array_values($commit->getDeleteRecords());
+            if (count($deleteRecords)) {
+                foreach ($deleteRecords as $record) {
+                    $this->processDeleteRecord($conn, $record);
+                    $affected['deleted'][] = ['uuid' => $record['uuid'], 'language' => $record['language']];
                 }
             }
 
@@ -173,6 +168,17 @@ class Collection
                 $this->processRecordTransaction($conn, $affected);
             }
         });
+    }
+
+    function processDeleteRecord(\PDO $conn, array $record) : void
+    {
+        $query = sprintf('DELETE FROM %s WHERE uuid=:uuid AND language=:language', $this->tableName('documents'));
+        $values = [
+            ':uuid' => $record['uuid'],
+            ':language' => $record['language'],
+        ];
+        $stmt = $conn->prepare($query);
+        $stmt->execute($values);
     }
 
     function processRecordTransaction(\PDO $conn, array $affected) : void

@@ -49,16 +49,6 @@ class Commit implements \Countable
         $this->message = $message ?? $this->message;
     }
 
-    /**
-     * Returns an iterator over the current set of records in this commit.
-     *
-     * @return \ArrayIterator
-     */
-    public function getIterator()
-    {
-        return new \ArrayIterator($this->addRecords);
-    }
-
     public function getAddRecords()
     {
         return $this->addRecords;
@@ -66,7 +56,7 @@ class Commit implements \Countable
 
     public function getDeleteRecords() : array
     {
-        return array_unique($this->deleteRecords);
+        return $this->deleteRecords;
     }
 
     /**
@@ -86,9 +76,9 @@ class Commit implements \Countable
         return $this;
     }
 
-    public function delete(string $uuid) : self
+    public function delete(string $uuid, string $language) : self
     {
-        $this->deleteRecords[] = $uuid;
+        $this->deleteRecords[] = ['uuid' => $uuid, 'language' => $language];
         return $this;
     }
 }
