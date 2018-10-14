@@ -148,52 +148,10 @@ class Collection
         $this->withTransaction(function (\PDO $conn) use ($commit) {
             $affected = [];
 
-            $tableName = $this->tableName('documents');
-
             $addRecords = $commit->getAddRecords();
             if (count($addRecords)) {
                 foreach ($addRecords as $record) {
-                    // Doing it the ugly multi-query way may not be necessary; it was only done to try and figure out
-                    // why the transaction ID is only sometimes readable.  The ODKU is probably workable.
-                    // Of course, in a just world we'd use an ANSI MERGE query, but the world is not just.
-
-                    $query = sprintf('SELECT 1 FROM %s WHERE uuid=:uuid AND language=:language', $tableName);
-                    $values = [
-                        ':uuid' => $record->uuid,
-                        ':language' => $record->language,
-                    ];
-                    $stmt = $conn->prepare($query);
-                    $stmt->execute($values);
-
-                    if (!$stmt->fetchColumn()) {
-                        $stmt = $conn->prepare(sprintf('INSERT INTO %s (uuid, language, document) VALUES (:uuid, :language, :document)', $tableName));
-                        $stmt->execute([
-                            ':uuid' => $record->uuid,
-                            ':language' => $record->language,
-                            ':document' => $record->document,
-                        ]);
-                    }
-                    else {
-                        $stmt = $conn->prepare(sprintf('UPDATE %s SET document=:document WHERE uuid=:uuid AND language=:language', $tableName));
-                        $stmt->execute([
-                            ':uuid' => $record->uuid,
-                            ':language' => $record->language,
-                            ':document' => $record->document,
-                        ]);
-                    }
-
-                    /*
-                    $query = sprintf("INSERT INTO %s SET document=:document, language=:language, uuid=:uuid ON DUPLICATE KEY
-                        UPDATE document=:document, language=:language, updated=NOW()", $this->tableName('documents'));
-                    $values = [
-                        ':uuid' => $record->uuid,
-                        ':document' => $record->document,
-                        ':language' => $record->language,
-                    ];
-                    $stmt = $conn->prepare($query);
-                    $stmt->execute($values);
-                    */
-
+                    $this->processAddRecord($conn, $record);
                     $affected['added'][] = ['uuid' => $record->uuid, 'language' => $record->language];
                 }
             }
@@ -212,38 +170,89 @@ class Collection
             }
 
             if (count($affected)) {
-                // This whole section is horribly buggy. The transaction is always present i nthe table when selecting the whole thing.
-                // However, reading just the current transaction's ID fails deterministically but unpredictably. I have NFI why
-                // it fails sometimes and not others, but once a test starts failing it always fails.
-                // It seems to be an issue with the trx_mysql_thread_id only sometimes matching the connection ID. This needs
-                // further research.
-
-                //$query = sprintf('INSERT INTO %s SET transaction=CURRENT_XID(), affected=:affected', $this->tableName('transactions'));
-                //$stmt = $conn->prepare($query);
-                //$stmt->execute([':affected' => json_encode($affected)]);
-
-                /*
-                This is all debugging code.
-
-                $trxs = $conn->query("SELECT * FROM INFORMATION_SCHEMA.INNODB_TRX")->fetchAll(\PDO::FETCH_ASSOC);
-                print_r($trxs);
-
-                $connid = $conn->query("SELECT CONNECTION_ID() AS conn_id")->fetchObject();
-                if ($connid) {
-                    print_r($connid);
-                } else {
-                    print_r($connid);
-                }
-
-                $xid = $conn->query("SELECT CURRENT_XID() AS xid")->fetchObject();
-                if ($xid) {
-                    print_r($xid);
-                } else {
-                    print_r($xid);
-                }
-                */
+                $this->processRecordTransaction($conn, $affected);
             }
         });
+    }
+
+    function processRecordTransaction(\PDO $conn, array $affected) : void
+    {
+        // This whole section is horribly buggy. The transaction is always present i nthe table when selecting the whole thing.
+        // However, reading just the current transaction's ID fails deterministically but unpredictably. I have NFI why
+        // it fails sometimes and not others, but once a test starts failing it always fails.
+        // It seems to be an issue with the trx_mysql_thread_id only sometimes matching the connection ID. This needs
+        // further research.
+
+        //$query = sprintf('INSERT INTO %s SET transaction=CURRENT_XID(), affected=:affected', $this->tableName('transactions'));
+        //$stmt = $conn->prepare($query);
+        //$stmt->execute([':affected' => json_encode($affected)]);
+
+        /*
+        This is all debugging code.
+
+        $trxs = $conn->query("SELECT * FROM INFORMATION_SCHEMA.INNODB_TRX")->fetchAll(\PDO::FETCH_ASSOC);
+        print_r($trxs);
+
+        $connid = $conn->query("SELECT CONNECTION_ID() AS conn_id")->fetchObject();
+        if ($connid) {
+            print_r($connid);
+        } else {
+            print_r($connid);
+        }
+
+        $xid = $conn->query("SELECT CURRENT_XID() AS xid")->fetchObject();
+        if ($xid) {
+            print_r($xid);
+        } else {
+            print_r($xid);
+        }
+        */
+    }
+
+    protected function processAddRecord(\PDO $conn, Record $record) : void
+    {
+        $tableName = $this->tableName('documents');
+
+        // Doing it the ugly multi-query way may not be necessary; it was only done to try and figure out
+        // why the transaction ID is only sometimes readable.  The ODKU is probably workable.
+        // Of course, in a just world we'd use an ANSI MERGE query, but the world is not just.
+
+        $query = sprintf('SELECT 1 FROM %s WHERE uuid=:uuid AND language=:language', $tableName);
+        $values = [
+            ':uuid' => $record->uuid,
+            ':language' => $record->language,
+        ];
+        $stmt = $conn->prepare($query);
+        $stmt->execute($values);
+
+        if (!$stmt->fetchColumn()) {
+            $stmt = $conn->prepare(sprintf('INSERT INTO %s (uuid, language, document) VALUES (:uuid, :language, :document)', $tableName));
+            $stmt->execute([
+                ':uuid' => $record->uuid,
+                ':language' => $record->language,
+                ':document' => $record->document,
+            ]);
+        }
+        else {
+            $stmt = $conn->prepare(sprintf('UPDATE %s SET document=:document WHERE uuid=:uuid AND language=:language', $tableName));
+            $stmt->execute([
+                ':uuid' => $record->uuid,
+                ':language' => $record->language,
+                ':document' => $record->document,
+            ]);
+        }
+
+        /*
+        $query = sprintf("INSERT INTO %s SET document=:document, language=:language, uuid=:uuid ON DUPLICATE KEY
+            UPDATE document=:document, language=:language, updated=NOW()", $this->tableName('documents'));
+        $values = [
+            ':uuid' => $record->uuid,
+            ':document' => $record->document,
+            ':language' => $record->language,
+        ];
+        $stmt = $conn->prepare($query);
+        $stmt->execute($values);
+        */
     }
 
     /**
