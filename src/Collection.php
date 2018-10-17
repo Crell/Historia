@@ -6,6 +6,8 @@ namespace Crell\Historia;
 class Collection
 {
 
+    public const DEFAULT_WORKSPACE = 'default';
+
     /**
      * @var string
      */
@@ -14,7 +16,7 @@ class Collection
     /**
      * @var string
      */
-    protected $workspace = 'default';
+    protected $workspace = self::DEFAULT_WORKSPACE;
 
     /**
      * @var \PDO
@@ -38,12 +40,13 @@ class Collection
         $this->conn->query("CREATE TABLE IF NOT EXISTS " . $this->tableName('documents') . "(
             uuid VARCHAR(36),
             language VARCHAR(5),
+            workspace VARCHAR(64),
             updated TIMESTAMP DEFAULT NOW(),
             document TEXT,
             start_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW START,
             end_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW END,
             PERIOD FOR SYSTEM_TIME(start_timestamp, end_timestamp),
-            PRIMARY KEY (uuid, language)
+            PRIMARY KEY (uuid, language, workspace)
         ) WITH SYSTEM VERSIONING");
 
         $this->conn->query('CREATE FUNCTION CURRENT_XID() RETURNS VARCHAR(18)
@@ -93,11 +96,25 @@ class Collection
             return [];
         }
 
+        $tableName = $this->tableName('documents');
+
         $placeholders = implode(',', array_fill(0, count($uuids), '?'));
-        $values = array_merge([$this->language], $uuids);
-        $query = sprintf('SELECT uuid, document, language, updated FROM %s WHERE language=? AND uuid IN (%s)', $this->tableName('documents'), $placeholders);
+        $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language], $uuids);
+        $query = sprintf('
+            WITH branch AS (SELECT * FROM %s WHERE workspace=? AND language=?)
+            SELECT
+                COALESCE(branch.uuid, base.uuid) AS uuid,
+                COALESCE(branch.document, base.document) AS document,
+                COALESCE(branch.language, base.language) AS language,
+                COALESCE(branch.updated, base.updated) AS updated
+            FROM %s AS base LEFT JOIN branch
+                ON branch.uuid=base.uuid
+                AND branch.language=base.language
+            WHERE base.workspace=? AND base.language=? AND base.uuid IN (%s)
+        ', $tableName, $tableName, $placeholders);
         $stmt = $this->conn->prepare($query);
         $stmt->execute($values);
+
 
         $stmt->setFetchMode(\PDO::FETCH_CLASS, Record::class);
 
@@ -172,10 +189,11 @@ class Collection
 
     function processDeleteRecord(\PDO $conn, array $record) : void
     {
-        $query = sprintf('DELETE FROM %s WHERE uuid=:uuid AND language=:language', $this->tableName('documents'));
+        $query = sprintf('DELETE FROM %s WHERE uuid=:uuid AND language=:language AND workspace=:workspace', $this->tableName('documents'));
         $values = [
             ':uuid' => $record['uuid'],
             ':language' => $record['language'],
+            ':workspace' => $this->workspace,
         ];
         $stmt = $conn->prepare($query);
         $stmt->execute($values);
@@ -223,6 +241,7 @@ class Collection
         // why the transaction ID is only sometimes readable.  The ODKU is probably workable.
         // Of course, in a just world we'd use an ANSI MERGE query, but the world is not just.
 
+        /*
         $query = sprintf('SELECT 1 FROM %s WHERE uuid=:uuid AND language=:language', $tableName);
         $values = [
             ':uuid' => $record->uuid,
@@ -247,18 +266,18 @@ class Collection
                 ':document' => $record->document,
             ]);
         }
+        */
 
-        /*
-        $query = sprintf("INSERT INTO %s SET document=:document, language=:language, uuid=:uuid ON DUPLICATE KEY
+        $query = sprintf("INSERT INTO %s SET document=:document, language=:language, uuid=:uuid, workspace=:workspace ON DUPLICATE KEY
             UPDATE document=:document, language=:language, updated=NOW()", $this->tableName('documents'));
         $values = [
             ':uuid' => $record->uuid,
             ':document' => $record->document,
             ':language' => $record->language,
+            ':workspace' => $this->workspace,
         ];
         $stmt = $conn->prepare($query);
         $stmt->execute($values);
-        */
     }
 
     /**

@@ -218,4 +218,33 @@ class CollectionTest extends TestCase
         // This tries to load in English, which we just deleted.
         $c->load('12345');
     }
+
+    public function test_update_record_in_workspace() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'))
+            ->add(new Record('4567', 'en', 'hi there'));
+        $c->commit($commit);
+
+        $cb = $c->forWorkspace('branch');
+
+        $commit = $cb->newCommit();
+        $commit->add(new Record('12345', 'en', 'goodbye world'));
+        $cb->commit($commit);
+
+        // Ensure that the default workspace still has the original value.
+        $record = $c->load('12345');
+        $this->assertEquals('hello world', $record->document);
+
+        // But the workspace has the new value.
+        $record = $cb->load('12345');
+        $this->assertEquals('goodbye world', $record->document);
+
+        // And the workspace falls through to the default workspace's value for the unedited record.
+        $record = $cb->load('4567');
+        $this->assertEquals('hi there', $record->document);
+    }
 }
