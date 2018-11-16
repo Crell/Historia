@@ -1,5 +1,6 @@
 {
     "name": "crell/historia",
+    "description": "History tracking data store.",
     "type": "library",
     "license": "LGPL-3.0-or-later",
     "authors": [
