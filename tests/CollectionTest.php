@@ -247,4 +247,33 @@ class CollectionTest extends TestCase
         $record = $cb->load('4567');
         $this->assertEquals('hi there', $record->document);
     }
+
+    public function test_creating_in_workspace_works() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'));
+        $c->commit($commit);
+
+        $cb = $c->forWorkspace('branch');
+
+        $commit = $cb->newCommit();
+        $commit->add(new Record('4567', 'en', 'goodbye world'));
+        $cb->commit($commit);
+
+        // Ensure that the workspace has the new record.
+        $record = $cb->load('4567');
+        $this->assertEquals('goodbye world', $record->document);
+
+        // But the default workspace does not have the new record.
+        try {
+            $record = $c->load('4567');
+            $this->fail('Record found in default workspace when it was only created in a branch.');
+        }
+        catch (RecordNotFound $e) {
+            // This is what's supposed to happen, so just swallow it as a win.
+        }
+    }
 }

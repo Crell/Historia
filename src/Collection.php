@@ -42,6 +42,7 @@ class Collection
             language VARCHAR(5),
             workspace VARCHAR(64),
             updated TIMESTAMP DEFAULT NOW(),
+            stub TINYINT(1) DEFAULT 0,
             document TEXT,
             start_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW START,
             end_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW END,
@@ -98,23 +99,39 @@ class Collection
 
         $tableName = $this->tableName('documents');
 
-        $placeholders = implode(',', array_fill(0, count($uuids), '?'));
-        $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language], $uuids);
-        $query = sprintf('
-            WITH branch AS (SELECT * FROM %s WHERE workspace=? AND language=?)
+        // If reading from the default workspace, we can use a much simpler query. This also lets us avoid dealing with
+        // stub records, as we can explicitly avoid those.
+        if ($this->workspace == static::DEFAULT_WORKSPACE) {
+            $placeholders = implode(',', array_fill(0, count($uuids), '?'));
+            $values = array_merge([$this->workspace, $this->language], $uuids);
+            $query = sprintf('
+            WITH base AS (SELECT * FROM %s WHERE workspace=? AND language=?)
+            SELECT uuid, document, language, updated
+            FROM base
+            WHERE base.uuid IN (%s) AND stub=0
+        ', $tableName, $placeholders);
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($values);
+        }
+        else {
+            $placeholders = implode(',', array_fill(0, count($uuids), '?'));
+            $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language], $uuids, $uuids);
+            $query = sprintf('
+            WITH branch AS (SELECT * FROM %s WHERE workspace=? AND language=?),
+                 base   AS (SELECT * FROM %s WHERE workspace=? AND language=?)
             SELECT
                 COALESCE(branch.uuid, base.uuid) AS uuid,
                 COALESCE(branch.document, base.document) AS document,
                 COALESCE(branch.language, base.language) AS language,
                 COALESCE(branch.updated, base.updated) AS updated
-            FROM %s AS base LEFT JOIN branch
+            FROM base LEFT JOIN branch
                 ON branch.uuid=base.uuid
                 AND branch.language=base.language
-            WHERE base.workspace=? AND base.language=? AND base.uuid IN (%s)
-        ', $tableName, $tableName, $placeholders);
-        $stmt = $this->conn->prepare($query);
-        $stmt->execute($values);
-
+            WHERE base.uuid IN (%s) OR branch.uuid IN (%s)
+        ', $tableName, $tableName, $placeholders, $placeholders);
+            $stmt = $this->conn->prepare($query);
+            $stmt->execute($values);
+        }
 
         $stmt->setFetchMode(\PDO::FETCH_CLASS, Record::class);
 
@@ -268,8 +285,25 @@ class Collection
         }
         */
 
+        $tableName = $this->tableName('documents');
+
+        // Life is simply easier if the base workspace always has a record, even if it was created in a branch.
+        // Therefore, create a stub in the base workspace if one does not exist already.
+        // We create it first so that if there is any difference in the timestamp, the stub comes before the branch document.
+        if ($this->workspace != static::DEFAULT_WORKSPACE && !$this->recordExistsInBaseWorkspace($conn, $record)) {
+            $query = sprintf("INSERT INTO %s SET document='', language=:language, uuid=:uuid, workspace=:workspace, stub=1", $tableName);
+            $values = [
+                ':uuid' => $record->uuid,
+                ':language' => $record->language,
+                ':workspace' => static::DEFAULT_WORKSPACE,
+            ];
+            $stmt = $conn->prepare($query);
+            $stmt->execute($values);
+        }
+
+
         $query = sprintf("INSERT INTO %s SET document=:document, language=:language, uuid=:uuid, workspace=:workspace ON DUPLICATE KEY
-            UPDATE document=:document, language=:language, updated=NOW()", $this->tableName('documents'));
+            UPDATE document=:document, language=:language, updated=NOW()", $tableName);
         $values = [
             ':uuid' => $record->uuid,
             ':document' => $record->document,
@@ -278,6 +312,24 @@ class Collection
         ];
         $stmt = $conn->prepare($query);
         $stmt->execute($values);
+
+
+    }
+
+    protected function recordExistsInBaseWorkspace(\PDO $conn, Record $record) : bool
+    {
+        $tableName = $this->tableName('documents');
+
+        $query = sprintf("SELECT COUNT(uuid) AS num FROM %s WHERE uuid=:uuid AND language=:language AND workspace=:workspace", $tableName);
+        $values = [
+            ':uuid' => $record->uuid,
+            ':language' => $record->language,
+            ':workspace' => static::DEFAULT_WORKSPACE,
+        ];
+        $stmt = $conn->prepare($query);
+        $stmt->execute($values);
+        $count = (int)$stmt->fetchColumn();
+        return (bool)$count;
     }
 
     /**
