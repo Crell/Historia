@@ -140,6 +140,11 @@ class Collection
         else {
             $placeholders = implode(',', array_fill(0, count($uuids), '?'));
             $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language, static::FLAG_NORMAL], $uuids);
+            // The flag filter must be in the WHERE clause so that it happens after the JOIN.  We want the join to still
+            // apply to records that have a non-normal flag value, so that the WHERE filter then removes the entire record
+            // thus filtering out deleted items.
+            // Because we guarantee that all records have a value in the base virtual table, we don't need to check UUIDs
+            // in the branch table.
             $query = sprintf('
             WITH branch AS (SELECT * FROM %s WHERE workspace=? AND language=?),
                  base   AS (SELECT * FROM %s WHERE workspace=? AND language=?)
