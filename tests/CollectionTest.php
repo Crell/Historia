@@ -276,4 +276,36 @@ class CollectionTest extends TestCase
             // This is what's supposed to happen, so just swallow it as a win.
         }
     }
+
+    /**
+     * @doesNotPerformAssertions
+     */
+    public function test_deleting_in_workspace_doesnt_affect_default() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'));
+        $c->commit($commit);
+
+        $cb = $c->forWorkspace('branch');
+
+        $commit = $cb->newCommit();
+        $commit->delete('12345', 'en');
+        $cb->commit($commit);
+
+        // Ensure that the workspace has the record deleted.
+        try {
+            $record = $cb->load('12345');
+            $this->fail('Record found in workspace when it has been deleted in that workspace.');
+        }
+        catch (RecordNotFound $e) {
+            // This is what's supposed to happen, so just swallow it as a win.
+        }
+
+        // But the default workspace still has the new record.
+        // If it doesn't, this will throw an exception.
+        $record = $c->load('12345');
+    }
 }

@@ -18,6 +18,29 @@ class Collection
      */
     protected $workspace = self::DEFAULT_WORKSPACE;
 
+
+    /**
+     * @var int
+     *
+     * Flag for a normal record.
+     */
+    protected const FLAG_NORMAL = 0;
+
+    /**
+     * @var int
+     *
+     * Flag for a record that is a stub. That is, it contains no data and exists only so that we can join against it.
+     */
+    protected const FLAG_STUB = 1;
+
+    /**
+     * @var int
+     *
+     * Flag for a deleted record. This exists primarily so that we can put a deleted marker in a workspace
+     * that will let us join against the base table to detect that a record has been deleted in the workspace.
+     */
+    protected const FLAG_DELETED = 2;
+
     /**
      * @var \PDO
      */
@@ -42,12 +65,13 @@ class Collection
             language VARCHAR(5),
             workspace VARCHAR(64),
             updated TIMESTAMP DEFAULT NOW(),
-            stub TINYINT(1) DEFAULT 0,
+            flag TINYINT(1) DEFAULT 0,
             document TEXT,
             start_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW START,
             end_timestamp TIMESTAMP(6) GENERATED ALWAYS AS ROW END,
             PERIOD FOR SYSTEM_TIME(start_timestamp, end_timestamp),
-            PRIMARY KEY (uuid, language, workspace)
+            PRIMARY KEY (uuid, language, workspace),
+            INDEX (flag)
         ) WITH SYSTEM VERSIONING");
 
         $this->conn->query('CREATE FUNCTION CURRENT_XID() RETURNS VARCHAR(18)
@@ -103,19 +127,19 @@ class Collection
         // stub records, as we can explicitly avoid those.
         if ($this->workspace == static::DEFAULT_WORKSPACE) {
             $placeholders = implode(',', array_fill(0, count($uuids), '?'));
-            $values = array_merge([$this->workspace, $this->language], $uuids);
+            $values = array_merge([$this->workspace, $this->language, static::FLAG_NORMAL], $uuids);
             $query = sprintf('
             WITH base AS (SELECT * FROM %s WHERE workspace=? AND language=?)
             SELECT uuid, document, language, updated
             FROM base
-            WHERE base.uuid IN (%s) AND stub=0
+            WHERE flag =? AND base.uuid IN (%s)
         ', $tableName, $placeholders);
             $stmt = $this->conn->prepare($query);
             $stmt->execute($values);
         }
         else {
             $placeholders = implode(',', array_fill(0, count($uuids), '?'));
-            $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language], $uuids, $uuids);
+            $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language, static::FLAG_NORMAL], $uuids, $uuids);
             $query = sprintf('
             WITH branch AS (SELECT * FROM %s WHERE workspace=? AND language=?),
                  base   AS (SELECT * FROM %s WHERE workspace=? AND language=?)
@@ -127,7 +151,7 @@ class Collection
             FROM base LEFT JOIN branch
                 ON branch.uuid=base.uuid
                 AND branch.language=base.language
-            WHERE base.uuid IN (%s) OR branch.uuid IN (%s)
+            WHERE (branch.flag=? OR branch.flag IS NULL) AND (base.uuid IN (%s) OR branch.uuid IN (%s))
         ', $tableName, $tableName, $placeholders, $placeholders);
             $stmt = $this->conn->prepare($query);
             $stmt->execute($values);
@@ -206,11 +230,21 @@ class Collection
 
     function processDeleteRecord(\PDO $conn, array $record) : void
     {
-        $query = sprintf('DELETE FROM %s WHERE uuid=:uuid AND language=:language AND workspace=:workspace', $this->tableName('documents'));
+        // @todo For now we're never deleting, just flagging something as deleted. That lets the workspace join work
+        // so that we can "delete" items in a workspace.  It MAY make sense to do a for-reals delete in the default
+        // workspace.  That's something to figure out later.
+
+        $tableName = $this->tableName('documents');
+
+        // We use an ODKU so that we can at least set an empty delete record in a workspace if the workspace has no
+        // version of the document yet.
+        $query = sprintf("INSERT INTO %s SET language=:language, uuid=:uuid, workspace=:workspace, flag=:flag ON DUPLICATE KEY
+            UPDATE flag=:flag, updated=NOW()", $tableName);
         $values = [
             ':uuid' => $record['uuid'],
             ':language' => $record['language'],
             ':workspace' => $this->workspace,
+            ':flag' => static::FLAG_DELETED,
         ];
         $stmt = $conn->prepare($query);
         $stmt->execute($values);
@@ -291,11 +325,12 @@ class Collection
         // Therefore, create a stub in the base workspace if one does not exist already.
         // We create it first so that if there is any difference in the timestamp, the stub comes before the branch document.
         if ($this->workspace != static::DEFAULT_WORKSPACE && !$this->recordExistsInBaseWorkspace($conn, $record)) {
-            $query = sprintf("INSERT INTO %s SET document='', language=:language, uuid=:uuid, workspace=:workspace, stub=1", $tableName);
+            $query = sprintf("INSERT INTO %s SET document='', language=:language, uuid=:uuid, workspace=:workspace, flag=:flag", $tableName);
             $values = [
                 ':uuid' => $record->uuid,
                 ':language' => $record->language,
                 ':workspace' => static::DEFAULT_WORKSPACE,
+                ':flag' => static::FLAG_STUB,
             ];
             $stmt = $conn->prepare($query);
             $stmt->execute($values);
