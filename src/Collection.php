@@ -139,7 +139,7 @@ class Collection
         }
         else {
             $placeholders = implode(',', array_fill(0, count($uuids), '?'));
-            $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language, static::FLAG_NORMAL], $uuids, $uuids);
+            $values = array_merge([$this->workspace, $this->language, static::DEFAULT_WORKSPACE, $this->language, static::FLAG_NORMAL], $uuids);
             $query = sprintf('
             WITH branch AS (SELECT * FROM %s WHERE workspace=? AND language=?),
                  base   AS (SELECT * FROM %s WHERE workspace=? AND language=?)
@@ -151,8 +151,8 @@ class Collection
             FROM base LEFT JOIN branch
                 ON branch.uuid=base.uuid
                 AND branch.language=base.language
-            WHERE (branch.flag=? OR branch.flag IS NULL) AND (base.uuid IN (%s) OR branch.uuid IN (%s))
-        ', $tableName, $tableName, $placeholders, $placeholders);
+            WHERE (branch.flag=? OR branch.flag IS NULL) AND base.uuid IN (%s)
+        ', $tableName, $tableName, $placeholders);
             $stmt = $this->conn->prepare($query);
             $stmt->execute($values);
         }
