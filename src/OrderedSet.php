@@ -34,7 +34,7 @@ class OrderedSet implements \ArrayAccess, \Countable, \IteratorAggregate
     /**
      * {@inheritdoc}
      */
-    public function getIterator()
+    public function getIterator(): \Traversable
     {
         return new \ArrayObject($this->values);
     }
@@ -42,7 +42,7 @@ class OrderedSet implements \ArrayAccess, \Countable, \IteratorAggregate
     /**
      * {@inheritdoc}
      */
-    public function count()
+    public function count(): int
     {
         return count($this->values);
     }
@@ -50,28 +50,32 @@ class OrderedSet implements \ArrayAccess, \Countable, \IteratorAggregate
     /**
      * {@inheritdoc}
      */
-    public function offsetExists($offset) {
+    public function offsetExists($offset): bool
+    {
         return isset($this->values[$offset]);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function offsetGet($offset) {
+    public function offsetGet($offset): mixed
+    {
         return $this->values[$offset];
     }
 
     /**
      * {@inheritdoc}
      */
-    public function offsetSet($offset, $value) {
+    public function offsetSet($offset, $value): void
+    {
         throw new \LogicException('Cannot set documents in a read-only document set.');
     }
 
     /**
      * {@inheritdoc}
      */
-    public function offsetUnset($offset) {
+    public function offsetUnset($offset): void
+    {
         throw new \LogicException('Cannot unset documents in a read-only document set.');
     }
 

@@ -65,7 +65,7 @@ class Commit implements \Countable
      * @return int
      *   The number of records in this commit.
      */
-    public function count()
+    public function count(): int
     {
         return count($this->addRecords);
     }

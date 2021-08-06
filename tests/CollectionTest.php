@@ -9,27 +9,33 @@ use PHPUnit\Framework\TestCase;
 class CollectionTest extends TestCase
 {
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
         $conn = $this->getConnection();
         $conn->query(sprintf('DROP DATABASE IF EXISTS %s', $this->dbName()));
         $conn->query(sprintf('CREATE DATABASE %s', $this->dbName()));
+        $conn->exec('USE ' . $this->dbName());
 
     }
 
-    protected function dbName() : string
+    protected function dbName(): string
     {
         return getenv('HISTORIA_DB_NAME') ?: 'historia';
     }
 
-    protected function getConnection() : \PDO
+    protected function getConnection(): \PDO
     {
-        $host = getenv('HISTORIA_DB_HOST') ?: '127.0.0.1';
+        return $this->conn ??= $this->createConnection();
+    }
+
+    protected function createConnection(): \PDO
+    {
+        $host = getenv('HISTORIA_DB_HOST') ?: 'db';
         $port = getenv('HISTORIA_DB_HOST') ?: '3306';
 
-        $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s', $host, $port, $this->dbName());
+        $dsn = sprintf('mysql:host=%s;port=%d', $host, $port);
         $conn = new \PDO($dsn, 'root', 'test', [
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
             // So we don't have to mess around with cursors and unbuffered queries by default.
@@ -47,7 +53,7 @@ class CollectionTest extends TestCase
         return $conn;
     }
 
-    public function test_can_initialize() : void
+    public function test_can_initialize(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -59,7 +65,7 @@ class CollectionTest extends TestCase
         $this->assertInstanceOf(\PDOStatement::class, $stmt);
     }
 
-    public function test_save_document() : void
+    public function test_save_document(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -73,7 +79,7 @@ class CollectionTest extends TestCase
         $this->assertEquals($value, $saved->document);
     }
 
-    public function test_save_multiple_documents() : void
+    public function test_save_multiple_documents(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -91,7 +97,7 @@ class CollectionTest extends TestCase
         $this->assertEquals('goodbye world', $r2->document);
     }
 
-    public function test_updating_record_works() : void
+    public function test_updating_record_works(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -108,7 +114,7 @@ class CollectionTest extends TestCase
         $this->assertEquals('goodbye world', $r1->document);
     }
 
-    public function test_deleting_record() : void
+    public function test_deleting_record(): void
     {
         $this->expectException(RecordNotFound::class);
 
@@ -127,7 +133,7 @@ class CollectionTest extends TestCase
         $r1 = $c->load('12345');
     }
 
-    public function test_load_multiple_existing_records() : void
+    public function test_load_multiple_existing_records(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -146,7 +152,7 @@ class CollectionTest extends TestCase
         $this->assertEquals('goodbye world', $records['4567']->document);
     }
 
-    public function test_load_multiple_partially_existing_records() : void
+    public function test_load_multiple_partially_existing_records(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -165,7 +171,7 @@ class CollectionTest extends TestCase
         $this->assertInstanceOf(\DateTimeImmutable::class, $records['12345']->updated);
     }
 
-    public function test_load_multiple_on_no_records_is_empty_return() : void
+    public function test_load_multiple_on_no_records_is_empty_return(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -175,7 +181,7 @@ class CollectionTest extends TestCase
         $this->assertCount(0, $records);
     }
 
-    public function test_saving_in_different_languages() : void
+    public function test_saving_in_different_languages(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -197,7 +203,7 @@ class CollectionTest extends TestCase
         $this->assertEquals('bonjour monde', $french->document);
     }
 
-    public function test_deleting_selected_languages() : void
+    public function test_deleting_selected_languages(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -219,7 +225,7 @@ class CollectionTest extends TestCase
         $c->load('12345');
     }
 
-    public function test_update_record_in_workspace() : void
+    public function test_update_record_in_workspace(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -248,7 +254,7 @@ class CollectionTest extends TestCase
         $this->assertEquals('hi there', $record->document);
     }
 
-    public function test_creating_in_workspace_works() : void
+    public function test_creating_in_workspace_works(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -280,7 +286,7 @@ class CollectionTest extends TestCase
     /**
      * @doesNotPerformAssertions
      */
-    public function test_deleting_in_workspace_doesnt_affect_default() : void
+    public function test_deleting_in_workspace_doesnt_affect_default(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
