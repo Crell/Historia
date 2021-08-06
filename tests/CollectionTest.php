@@ -313,7 +313,7 @@ class CollectionTest extends TestCase
         $record = $c->load('12345');
     }
 
-    public function test_merging_workspace_to_default_adds_records() : void
+    public function test_merging_workspace_to_default_adds_records(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -339,7 +339,7 @@ class CollectionTest extends TestCase
         $this->assertCount(2, $records);
     }
 
-    public function test_merging_workspace_to_default_updates_records() : void
+    public function test_merging_workspace_to_default_updates_records(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();
@@ -365,7 +365,7 @@ class CollectionTest extends TestCase
         $this->assertEquals('goodbye world', $record->document);
     }
 
-    public function test_merging_workspace_to_default_deletes_records() : void
+    public function test_merging_workspace_to_default_deletes_records(): void
     {
         $c = new Collection($this->getConnection(), 'col');
         $c->initializeSchema();

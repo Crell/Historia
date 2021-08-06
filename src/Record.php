@@ -5,25 +5,14 @@ namespace Crell\Historia;
 
 class Record
 {
-    /**
-     * @var string
-     */
-    public $uuid = '';
+    public string $uuid = '';
 
-    /**
-     * @var string
-     */
-    public $document = '';
+    public string $document = '';
 
-    /**
-     * @var \DateTimeImmutable
-     */
-    public $updated;
+    // @todo This properly likely means we need to avoid the PDO-load-to-object and do it ourselves.
+    public \DateTimeImmutable|string $updated;
 
-    /**
-     * @var string
-     */
-    public $language = '';
+    public string $language = '';
 
     public function __construct(string $uuid = '', string $language = 'en', string $document = '')
     {

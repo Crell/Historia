@@ -10,10 +10,8 @@ class Commit implements \Countable
 {
     /**
      * The commit message for this commit.
-     *
-     * @var string
      */
-    protected $message = 'No message';
+    protected string $message = 'No message';
 
     /**
      * The author of this commit.
@@ -25,15 +23,9 @@ class Commit implements \Countable
      */
     protected $author = 'Anonymous';
 
-    /**
-     * @var array
-     */
-    protected $addRecords = [];
+    protected array $addRecords = [];
 
-    /**
-     * @var array
-     */
-    protected $deleteRecords = [];
+    protected array $deleteRecords = [];
 
     /**
      * Constructs a new Commit object.
@@ -49,12 +41,12 @@ class Commit implements \Countable
         $this->message = $message ?? $this->message;
     }
 
-    public function getAddRecords()
+    public function getAddRecords(): array
     {
         return $this->addRecords;
     }
 
-    public function getDeleteRecords() : array
+    public function getDeleteRecords(): array
     {
         return $this->deleteRecords;
     }
@@ -70,13 +62,13 @@ class Commit implements \Countable
         return count($this->addRecords);
     }
 
-    public function add(Record $record) : self
+    public function add(Record $record): static
     {
         $this->addRecords[] = $record;
         return $this;
     }
 
-    public function delete(string $uuid, string $language) : self
+    public function delete(string $uuid, string $language): static
     {
         $this->deleteRecords[] = ['uuid' => $uuid, 'language' => $language];
         return $this;

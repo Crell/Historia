@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 class JustFiddling extends TestCase
 {
 
-    public function test_stuff() : void
+    public function test_stuff(): void
     {
         $collection = new Collection();
 
@@ -38,14 +38,14 @@ class JustFiddling extends TestCase
         $collection->forTransaction($txnId)->load($uuid, 'images');
     }
 
-    public function test_multiple() : void
+    public function test_multiple(): void
     {
         $collection = new Collection();
 
         $collection->loadMultiple('documents', []);
     }
 
-    public function test_wrapper() : void
+    public function test_wrapper(): void
     {
 
         $collection = new Collection();
@@ -54,7 +54,7 @@ class JustFiddling extends TestCase
 
     }
 
-    public function test_shelves() : void
+    public function test_shelves(): void
     {
         $collection = new Collection();
         $collection->addShelf('documents', new JsonShelf());

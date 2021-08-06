@@ -4,13 +4,17 @@ declare (strict_types = 1);
 
 namespace Crell\Historia;
 
-
+/**
+ * Takes a keyed iterator and forces it to return values in a specified order.
+ *
+ * Items will be returned in the order specified by key. Any unmentioned
+ * items will be returned in their original order.
+ */
 class OrderedSet implements \ArrayAccess, \Countable, \IteratorAggregate
 {
+    protected array $values = [];
 
-    protected $values = [];
-
-    public function __construct(\Traversable $iterator, $order = [])
+    public function __construct(\Traversable $iterator, array $order = [])
     {
         $values = iterator_to_array($iterator);
 

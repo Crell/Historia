@@ -5,28 +5,23 @@ namespace Crell\Historia\Shelf;
 
 class TextRecord
 {
-    /** @var string */
-    protected $uuid;
 
-    protected $value = '';
+    public function __construct(
+        protected string $uuid,
+        protected mixed $value = '',
+    ) {}
 
-    public function __construct(string $uuid, $value = '')
-    {
-        $this->uuid = $uuid;
-        $this->value = $value;
-    }
-
-    public function uuid() : string
+    public function uuid(): string
     {
         return $this->uuid;
     }
 
-    public function value() : string
+    public function value(): string
     {
         return $this->value;
     }
 
-    public function setValue(string $value) : self
+    public function setValue(string $value): static
     {
         $this->value = $value;
         return $this;

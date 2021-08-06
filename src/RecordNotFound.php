@@ -8,7 +8,7 @@ use Throwable;
 class RecordNotFound extends \InvalidArgumentException
 {
 
-    public static function forUuid(string $uuid, string $language) : self
+    public static function forUuid(string $uuid, string $language): static
     {
         $message = sprintf('No record found: %s in language %s', $uuid, $language);
         return new static($message);

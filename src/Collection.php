@@ -5,22 +5,14 @@ namespace Crell\Historia;
 
 class Collection
 {
-
     public const DEFAULT_WORKSPACE = 'default';
 
-    /**
-     * @var string
-     */
-    protected $language = 'en';
-
-    /**
-     * @var string
-     */
-    protected $workspace = self::DEFAULT_WORKSPACE;
-
+    protected string $workspace = self::DEFAULT_WORKSPACE;
 
     /**
      * @var int
+     *
+     * @todo Excellent use case for an Enum.
      *
      * Flag for a normal record.
      */
@@ -41,24 +33,18 @@ class Collection
      */
     protected const FLAG_DELETED = 2;
 
-    /**
-     * @var \PDO
-     */
-    protected $conn;
+    public function __construct(
+        protected \PDO $conn,
+        protected string $name,
+        protected $language = 'en',
+    ) {}
 
-    public function __construct(\PDO $conn, string $name, $language = 'en')
-    {
-        $this->conn = $conn;
-        $this->name = $name;
-        $this->language = $language;
-    }
-
-    protected function tableName(string $table) : string
+    protected function tableName(string $table): string
     {
         return sprintf('historia_%s_%s', $this->name, $table);
     }
 
-    public function initializeSchema() : self
+    public function initializeSchema(): static
     {
         $this->conn->query("CREATE TABLE IF NOT EXISTS " . $this->tableName('documents') . "(
             uuid VARCHAR(36),
@@ -91,14 +77,14 @@ class Collection
         return $this;
     }
 
-    public function save(Record $record)
+    public function save(Record $record): void
     {
         $commit = $this->newCommit();
         $commit->add($record);
         $this->commit($commit);
     }
 
-    public function load(string $uuid) : Record
+    public function load(string $uuid): Record
     {
         $records = $this->loadMultiple([$uuid]);
 
@@ -109,7 +95,7 @@ class Collection
         return current(iterator_to_array($records));
     }
 
-    public function loadMultiple(iterable $uuids) : iterable
+    public function loadMultiple(iterable $uuids): iterable
     {
         // Let people pass in any iterable, but we really do need an array internally.
         if ($uuids instanceof \Traversable) {
@@ -173,7 +159,7 @@ class Collection
         return new OrderedSet($returns(), $uuids);
     }
 
-    public function mergeWorkspace(string $workspace) : self
+    public function mergeWorkspace(string $workspace): static
     {
 
         // @todo This has no collision detection yet. That is a bug. I'm not sure how to do that yet.
@@ -226,19 +212,19 @@ class Collection
         return $this;
     }
 
-    public function deleteWorkspace(string $workspace) : self
+    public function deleteWorkspace(string $workspace): static
     {
         // @todo Implement this.
 
         return $this;
     }
 
-    public function name() : string
+    public function name(): string
     {
         return $this->name;
     }
 
-    public function forLanguage(string $language) : self
+    public function forLanguage(string $language): static
     {
         $new = clone $this;
         $new->language = $language;
@@ -246,7 +232,7 @@ class Collection
         return $new;
     }
 
-    public function forWorkspace(string $workspace) : self
+    public function forWorkspace(string $workspace): static
     {
         $new = clone $this;
         $new->workspace = $workspace;
@@ -260,7 +246,7 @@ class Collection
         return $this->shelves[$shelf]->create();
     }
 
-    public function newCommit(string $author = null, string $message = null) : Commit
+    public function newCommit(string $author = null, string $message = null): Commit
     {
         return new Commit($author, $message);
     }
@@ -292,7 +278,7 @@ class Collection
         });
     }
 
-    function processDeleteRecord(\PDO $conn, array $record) : void
+    function processDeleteRecord(\PDO $conn, array $record): void
     {
         // @todo For now we're never deleting, just flagging something as deleted. That lets the workspace join work
         // so that we can "delete" items in a workspace.  It MAY make sense to do a for-reals delete in the default
@@ -314,9 +300,9 @@ class Collection
         $stmt->execute($values);
     }
 
-    function processRecordTransaction(\PDO $conn, array $affected) : void
+    function processRecordTransaction(\PDO $conn, array $affected): void
     {
-        // This whole section is horribly buggy. The transaction is always present i nthe table when selecting the whole thing.
+        // This whole section is horribly buggy. The transaction is always present in the table when selecting the whole thing.
         // However, reading just the current transaction's ID fails deterministically but unpredictably. I have NFI why
         // it fails sometimes and not others, but once a test starts failing it always fails.
         // It seems to be an issue with the trx_mysql_thread_id only sometimes matching the connection ID. This needs
@@ -348,7 +334,7 @@ class Collection
         */
     }
 
-    protected function processAddRecord(\PDO $conn, Record $record) : void
+    protected function processAddRecord(\PDO $conn, Record $record): void
     {
         $tableName = $this->tableName('documents');
 
@@ -383,8 +369,6 @@ class Collection
         }
         */
 
-        $tableName = $this->tableName('documents');
-
         // Life is simply easier if the base workspace always has a record, even if it was created in a branch.
         // Therefore, create a stub in the base workspace if one does not exist already.
         // We create it first so that if there is any difference in the timestamp, the stub comes before the branch document.
@@ -415,7 +399,7 @@ class Collection
 
     }
 
-    protected function recordExistsInBaseWorkspace(\PDO $conn, Record $record) : bool
+    protected function recordExistsInBaseWorkspace(\PDO $conn, Record $record): bool
     {
         $tableName = $this->tableName('documents');
 
@@ -440,7 +424,7 @@ class Collection
      *
      * @throws \Throwable
      */
-    public function withTransaction(callable $func) : ?\PDOStatement
+    public function withTransaction(callable $func): ?\PDOStatement
     {
         try {
             $this->conn->beginTransaction();

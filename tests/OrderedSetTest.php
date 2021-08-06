@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 class OrderedSetTest extends TestCase
 {
 
-    protected function sampleData()
+    protected function sampleData(): \ArrayObject
     {
         return new \ArrayObject([
             'a' => 'A',
@@ -19,7 +19,7 @@ class OrderedSetTest extends TestCase
         ]);
     }
 
-    public function testCanReadElements()
+    public function testCanReadElements(): void
     {
         $set = new OrderedSet($this->sampleData());
 
@@ -27,7 +27,7 @@ class OrderedSetTest extends TestCase
         $this->assertEquals('C', $set['c']);
     }
 
-    public function testCanCheckForElements()
+    public function testCanCheckForElements(): void
     {
         $set = new OrderedSet($this->sampleData());
 
@@ -35,14 +35,14 @@ class OrderedSetTest extends TestCase
         $this->assertFalse(isset($set['e']));
     }
 
-    public function testCount()
+    public function testCount(): void
     {
         $set = new OrderedSet($this->sampleData());
 
         $this->assertEquals(4, count($set));
     }
 
-    public function testCannotSetValues()
+    public function testCannotSetValues(): void
     {
         $set = new OrderedSet($this->sampleData());
 
@@ -51,7 +51,7 @@ class OrderedSetTest extends TestCase
         $set['e'] = 'E';
     }
 
-    public function testCannotUnsetValues()
+    public function testCannotUnsetValues(): void
     {
         $set = new OrderedSet($this->sampleData());
 
@@ -60,7 +60,7 @@ class OrderedSetTest extends TestCase
         unset($set['a']);
     }
 
-    public function testCanIterate()
+    public function testCanIterate(): void
     {
         $set = new OrderedSet($this->sampleData());
 
@@ -71,7 +71,7 @@ class OrderedSetTest extends TestCase
         $this->assertCount(4, $set_array);
     }
 
-    public function testOrderedSet()
+    public function testOrderedSet(): void
     {
         $set = new OrderedSet($this->sampleData(), ['b', 'c', 'a', 'd']);
 
@@ -81,7 +81,7 @@ class OrderedSetTest extends TestCase
         $this->assertEquals(['b', 'c', 'a', 'd'], $keys);
     }
 
-    public function testIncompleteOrderedSet()
+    public function testIncompleteOrderedSet(): void
     {
         $set = new OrderedSet($this->sampleData(), ['b', 'd']);
 
@@ -91,7 +91,7 @@ class OrderedSetTest extends TestCase
         $this->assertEquals(['b', 'd', 'a', 'c'], $keys);
     }
 
-    public function testOversizedOrderedSet()
+    public function testOversizedOrderedSet(): void
     {
         $set = new OrderedSet($this->sampleData(), ['b', 'd', 'q']);
 
