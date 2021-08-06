@@ -283,9 +283,6 @@ class CollectionTest extends TestCase
         }
     }
 
-    /**
-     * @doesNotPerformAssertions
-     */
     public function test_deleting_in_workspace_doesnt_affect_default(): void
     {
         $c = new Collection($this->getConnection(), 'col');
@@ -308,10 +305,94 @@ class CollectionTest extends TestCase
         }
         catch (RecordNotFound $e) {
             // This is what's supposed to happen, so just swallow it as a win.
+            $this->assertTrue(true, 'The deleted record was not found');
         }
 
         // But the default workspace still has the new record.
         // If it doesn't, this will throw an exception.
         $record = $c->load('12345');
     }
+
+    public function test_merging_workspace_to_default_adds_records() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'));
+        $c->commit($commit);
+
+        $cb = $c->forWorkspace('branch');
+
+        $commit = $cb->newCommit();
+        $commit->add(new Record('4567', 'en', 'goodbye world'));
+        $cb->commit($commit);
+
+        // Ensure that the workspace has the new record.
+        $record = $cb->load('4567');
+        $this->assertEquals('goodbye world', $record->document);
+
+        // Merge to the default workspace, which should now have both records.
+        $c->mergeWorkspace('branch');
+
+        $records = $c->loadMultiple(['12345', '4567']);
+        $this->assertCount(2, $records);
+    }
+
+    public function test_merging_workspace_to_default_updates_records() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'));
+        $c->commit($commit);
+
+        $cb = $c->forWorkspace('branch');
+
+        $commit = $cb->newCommit();
+        $commit->add(new Record('12345', 'en', 'goodbye world'));
+        $cb->commit($commit);
+
+        // Ensure that the workspace has the new record.
+        $record = $cb->load('12345');
+        $this->assertEquals('goodbye world', $record->document);
+
+        // Merge to the default workspace, which should now have the updated record.
+        $c->mergeWorkspace('branch');
+
+        $record = $c->load('12345');
+        $this->assertEquals('goodbye world', $record->document);
+    }
+
+    public function test_merging_workspace_to_default_deletes_records() : void
+    {
+        $c = new Collection($this->getConnection(), 'col');
+        $c->initializeSchema();
+
+        $commit = $c->newCommit();
+        $commit->add(new Record('12345', 'en', 'hello world'));
+        $c->commit($commit);
+
+        $cb = $c->forWorkspace('branch');
+
+        $commit = $cb->newCommit();
+        $commit->delete('12345', 'en');
+        $commit->add(new Record('12345', 'en', 'goodbye world'));
+        $cb->commit($commit);
+
+        // Merge to the default workspace, which should delete that record.
+        $c->mergeWorkspace('branch');
+
+        // Ensure that the workspace has the record deleted.
+        try {
+            $record = $c->load('12345');
+            $this->fail('Record found in workspace when it has been deleted in that workspace.');
+        }
+        catch (RecordNotFound $e) {
+            // This is what's supposed to happen, so just swallow it as a win.
+            $this->assertTrue(true, 'The deleted record was not found');
+        }
+    }
+
 }

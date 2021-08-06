@@ -107,7 +107,6 @@ class Collection
         }
 
         return current(iterator_to_array($records));
-
     }
 
     public function loadMultiple(iterable $uuids) : iterable
@@ -172,6 +171,66 @@ class Collection
 
         // Force the records into the order provided.
         return new OrderedSet($returns(), $uuids);
+    }
+
+    public function mergeWorkspace(string $workspace) : self
+    {
+
+        // @todo This has no collision detection yet. That is a bug. I'm not sure how to do that yet.
+
+        $tableName = $this->tableName('documents');
+
+        // We are guaranteed that the base view always has a record, so we can just
+        // update in place all records. Note that this also has the result of transferring
+        // a "deleted" flag from the branch to the default, which means the record is still
+        // there but is now un-findable.  That lets us look up "we had it but deleted it" records,
+        // which can be useful for auditing or HTTP 410 Gone responses.
+        // A Purge operation later on can clear it out entirely.
+
+        /* This would be better, but MariaDB doesn't support CTEs in UPDATE clauses. Blargh.
+        $query = sprintf('
+        WITH branch AS (SELECT * FROM %s WHERE workspace=:workspace)
+        UPDATE %s base
+        JOIN branch
+            ON base.uuid=branch.uuid
+            AND base.language=branch.language
+            AND base.workspace=:base
+        SET
+            base.flag=branch.flag,
+            base.document=branch.document,
+            base.updated=branch.updated
+            ', $tableName, $tableName);
+        */
+        $query = sprintf('
+        UPDATE %s base
+        INNER JOIN (SELECT * FROM %s WHERE workspace=:workspace) AS branch
+            ON base.uuid=branch.uuid
+            AND base.language=branch.language
+            AND base.workspace=:base
+        SET
+            base.flag=branch.flag,
+            base.document=branch.document,
+            base.updated=branch.updated
+            ', $tableName, $tableName);
+
+        $values = [
+            ':workspace' => $workspace,
+            ':base' => static::DEFAULT_WORKSPACE,
+        ];
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($values);
+
+        // Now that the workspace is merged, we can delete it entirely.
+        $this->deleteWorkspace($workspace);
+
+        return $this;
+    }
+
+    public function deleteWorkspace(string $workspace) : self
+    {
+        // @todo Implement this.
+
+        return $this;
     }
 
     public function name() : string
